@@ -14,6 +14,9 @@ module Plaid
     # URL like 'https://tartan.plaid.com'.
     attr_accessor :env
 
+    # Public: Available Plaid products.
+    PRODUCTS = %i(connect auth info income risk)
+
     # Public: A helper function to ease configuration.
     #
     # Yields self.
@@ -38,7 +41,7 @@ module Plaid
           self.env << '/'
         end
       else
-        raise ArgumentError, "Invalid value for Plaid.env: must be :tartan, :api, or a full URL, e.g. 'https://tartan.plaid.com'"
+        raise ArgumentError, "Invalid value for Plaid.env (#{env.inspect}): must be :tartan, :api, or a full URL, e.g. 'https://tartan.plaid.com'"
       end
     end
   end

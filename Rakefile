@@ -10,6 +10,6 @@ RDoc::Task.new do |rdoc|
   #rdoc.template = 'rails'
   rdoc.main = "README.md"
 
-  rdoc.rdoc_files.include("README.md", "lib/*.rb")
+  rdoc.rdoc_files.include("README.md", "LICENSE.txt", "lib/**/*.rb")
   rdoc.markup = 'tomdoc'
 end
