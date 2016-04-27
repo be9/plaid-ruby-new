@@ -1,0 +1,15 @@
+Wed, 27 Apr 2016 21:03:04 +0600
+README.md	Wed, 27 Apr 2016 21:02:59 +0600
+LICENSE.txt	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/account.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/category.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/connector.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/errors.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/income.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/info.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/institution.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/risk.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/transaction.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/user.rb	Wed, 27 Apr 2016 21:02:59 +0600
+lib/plaid/version.rb	Wed, 27 Apr 2016 21:02:59 +0600
