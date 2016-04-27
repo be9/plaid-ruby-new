@@ -2,6 +2,7 @@ require 'plaid/version'
 require 'plaid/errors'
 require 'plaid/connector'
 require 'plaid/category'
+require 'plaid/institution'
 
 require 'uri'
 

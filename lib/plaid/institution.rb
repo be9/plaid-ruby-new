@@ -1,5 +1,57 @@
 module Plaid
+  # Public: A class encapsulating information about a Financial Institution
+  # supported by Plaid.
   class Institution
+    # Public: The String institution ID. E.g. "5301a93ac140de84910000e0".
+    attr_reader :id
+
+    # Public: The String institution name. E.g. "Bank of America".
+    attr_reader :name
+
+    # Public: The String institution shortname, or "type" per Plaid API docs.
+    # E.g. "bofa".
+    attr_reader :type
+
+    # Public: The Boolean flag telling if the institution requires MFA.
+    attr_reader :has_mfa
+
+    # Public: The Hash with MFA options available. E.g. ["code", "list",
+    # "questions(3)"]. This means that you are allowed to request a list of
+    # possible MFA options, use code-based MFA and questions MFA (there are 3
+    # questions).
+    attr_reader :mfa
+
+    # Public: The Hash with credential labels, how they are exactly named by
+    # the institution. E.g. {"username": "Online ID", "password": "Password"}.
+    attr_reader :credentials
+
+    # Public: An Array with Symbol product names supported by the institution.
+    # E.g. [:connect, :auth, :balance, :info, :income, :risk]. See
+    # Plaid::PRODUCTS.
+    attr_reader :products
+
+    # Private: Initialize an Institution with given fields.
+    def initialize(fields)
+      @id = fields['id']
+      @name = fields['name']
+      @type = fields['type']
+      @has_mfa = fields['has_mfa']
+      @mfa = fields['mfa']
+      @credentials = fields['credentials']
+      @products = fields['products'].map(&:to_sym)
+    end
+
+    # Public: Get a String representation of the institution.
+    #
+    # Returns a String.
+    def inspect
+      %{#<Plaid::Institution id=#{id.inspect}, type=#{type.inspect}, name=#{name.inspect}>}
+    end
+
+    # Public: Get a String representation of the institution.
+    #
+    # Returns a String.
+    alias to_s inspect
 
     # Public: Get information about the Financial Institutions currently
     # supported by Plaid.
@@ -8,6 +60,9 @@ module Plaid
     #
     # Returns an Array of Institution instances.
     def self.all
+      Connector.new(:institutions).get.map do |idata|
+        new(idata)
+      end
     end
 
     # Public: Get information about a given Financial Institution.
@@ -16,8 +71,10 @@ module Plaid
     #
     # id - the String institution ID (e.g. "5301a93ac140de84910000e0").
     #
-    # Returns an Institution instance, or nil if institution was not found.
+    # Returns an Institution instance or raises Plaid::NotFoundError if
+    # institution with given id is not found.
     def self.get(id)
+      new Connector.new(:institutions, id).get
     end
 
     # Public: Get information about the "long tail" institutions supported
