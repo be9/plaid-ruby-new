@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["olegdashevskii@gmail.com"]
 
   spec.summary       = %q{Ruby bindings for Plaid}
-  spec.description   = %q{Ruby gem wrapper for the Plaid API. Read more at the homepage, the wiki, or the plaid documentation.}
+  spec.description   = %q{Ruby gem wrapper for the Plaid API. Read more at the homepage, the wiki, or in the Plaid documentation.}
   spec.homepage      = "https://github.com/plaid/plaid-ruby"
   spec.license       = "MIT"
 
@@ -24,4 +24,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 1.11"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "sdoc", "~> 0.4.1"
+  spec.add_development_dependency "pry", "~> 0.10.3"
 end
