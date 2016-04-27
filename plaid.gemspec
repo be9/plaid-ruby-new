@@ -28,4 +28,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "sdoc", "~> 0.4.1"
   spec.add_development_dependency "pry", "~> 0.10.3"
   spec.add_development_dependency "webmock", "~> 2.0.0"
+  spec.add_development_dependency "minitest", "~> 5.8"
 end
