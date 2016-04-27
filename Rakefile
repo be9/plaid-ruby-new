@@ -19,3 +19,5 @@ Rake::TestTask.new do |t|
   t.verbose = true
   t.ruby_opts << '-rminitest/pride'
 end
+
+task :default => :test
