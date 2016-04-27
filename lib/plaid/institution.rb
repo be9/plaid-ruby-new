@@ -15,6 +15,9 @@ module Plaid
     # Public: The Boolean flag telling if the institution requires MFA.
     attr_reader :has_mfa
 
+    # Public: Returns true if the institution requires MFA.
+    alias has_mfa? has_mfa
+
     # Public: The Hash with MFA options available. E.g. ["code", "list",
     # "questions(3)"]. This means that you are allowed to request a list of
     # possible MFA options, use code-based MFA and questions MFA (there are 3
