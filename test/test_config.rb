@@ -1,8 +1,6 @@
-require 'minitest/autorun'
-require 'plaid'
+require 'test_helper'
 
 class PlaidConfigTest < MiniTest::Test
-
   def test_symbol_environments
     Plaid.config do |p|
       p.env = :tartan
@@ -20,14 +18,6 @@ class PlaidConfigTest < MiniTest::Test
   def test_string_url
     Plaid.config do |p|
       p.env = 'https://www.example.com/'
-    end
-
-    assert_equal 'https://www.example.com/', Plaid.env
-  end
-
-  def test_trailing_slash
-    Plaid.config do |p|
-      p.env = 'https://www.example.com'
     end
 
     assert_equal 'https://www.example.com/', Plaid.env

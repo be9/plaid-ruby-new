@@ -1,4 +1,9 @@
 require 'plaid/version'
+require 'plaid/errors'
+require 'plaid/connector'
+require 'plaid/category'
+
+require 'uri'
 
 module Plaid
   class <<self
@@ -37,8 +42,10 @@ module Plaid
       when :tartan, :api
         self.env = "https://#{env}.plaid.com/"
       when String
-        if env[-1] != '/'
-          self.env << '/'
+        begin
+          URI.parse(env)
+        rescue
+          raise ArgumentError, "Invalid URL in Plaid.env (#{env.inspect}). Specify either Symbol (:tartan, :api), or a full URL, like 'https://tartan.plaid.com'"
         end
       else
         raise ArgumentError, "Invalid value for Plaid.env (#{env.inspect}): must be :tartan, :api, or a full URL, e.g. 'https://tartan.plaid.com'"
