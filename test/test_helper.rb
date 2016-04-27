@@ -15,6 +15,8 @@ module TestHelpers
   end
 
   def tartan
-    Plaid.env = :tartan
+    Plaid.config do |p|
+      p.env = :tartan
+    end
   end
 end

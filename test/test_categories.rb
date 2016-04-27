@@ -12,7 +12,7 @@ class PlaidCategoriesTest < MiniTest::Test
                              'hierarchy' => ["Travel"],
                              'id' => "22000000"})
 
-    str = %{#<Plaid::Category type=:place, hierarchy=["Travel"], id="22000000">}
+    str = %{#<Plaid::Category id="22000000", type=:place, hierarchy=["Travel"]>}
 
     assert_equal str, c.to_s
     assert_equal str, c.inspect

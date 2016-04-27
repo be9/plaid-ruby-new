@@ -1,6 +1,14 @@
 module Plaid
   class Category
-    attr_reader :type, :hierarchy, :id
+    # Public: The String category ID, e.g. "21010006".
+    attr_reader :id
+
+    # Public: The Symbol category type. One of :special, :place, :digital.
+    attr_reader :type
+
+    # Public: The Array of String hierarchy. E.g.
+    # ["Food and Drink", "Nightlife", "Adult Entertainment"].
+    attr_reader :hierarchy
 
     # Private: Initialize a Category with given fields.
     def initialize(fields)
@@ -13,7 +21,7 @@ module Plaid
     #
     # Returns a String.
     def inspect
-      %{#<Plaid::Category type=#{type.inspect}, hierarchy=#{hierarchy.inspect}, id=#{id.inspect}>}
+      %{#<Plaid::Category id=#{id.inspect}, type=#{type.inspect}, hierarchy=#{hierarchy.inspect}>}
     end
 
     # Public: Get a String representation of Category.
@@ -38,7 +46,8 @@ module Plaid
     #
     # id - the String category ID (e.g. "17001013").
     #
-    # Returns a Category instance.
+    # Returns a Category instance or raises Plaid::NotFoundError if category
+    # with given id is not found.
     def self.get(id)
       new Connector.new(:categories, id).get
     end
