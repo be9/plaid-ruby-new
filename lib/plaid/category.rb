@@ -8,7 +8,7 @@ module Plaid
     attr_reader :type
 
     # Public: The Array of String hierarchy. E.g.
-    # ["Food and Drink", "Nightlife", "Adult Entertainment"].
+    # ["Food and Drink", "Nightlife"].
     attr_reader :hierarchy
 
     # Private: Initialize a Category with given fields.
