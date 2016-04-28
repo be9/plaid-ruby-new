@@ -11,7 +11,7 @@ module Plaid
     # ["Food and Drink", "Nightlife"].
     attr_reader :hierarchy
 
-    # Private: Initialize a Category with given fields.
+    # Internal: Initialize a Category with given fields.
     def initialize(fields)
       @type = fields['type'].to_sym
       @hierarchy = fields['hierarchy']
@@ -22,7 +22,8 @@ module Plaid
     #
     # Returns a String.
     def inspect
-      %{#<Plaid::Category id=#{id.inspect}, type=#{type.inspect}, hierarchy=#{hierarchy.inspect}>}
+      "#<Plaid::Category id=#{id.inspect}, type=#{type.inspect}, " \
+      "hierarchy=#{hierarchy.inspect}>"
     end
 
     # Public: Get a String representation of Category.

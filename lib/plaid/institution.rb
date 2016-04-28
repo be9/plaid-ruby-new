@@ -33,7 +33,7 @@ module Plaid
     # Plaid::PRODUCTS.
     attr_reader :products
 
-    # Private: Initialize an Institution with given fields.
+    # Internal: Initialize an Institution with given fields.
     def initialize(fields)
       @id = fields['id']
       @name = fields['name']
@@ -48,7 +48,8 @@ module Plaid
     #
     # Returns a String.
     def inspect
-      %{#<Plaid::Institution id=#{id.inspect}, type=#{type.inspect}, name=#{name.inspect}>}
+      "#<Plaid::Institution id=#{id.inspect}, type=#{type.inspect}, " \
+      "name=#{name.inspect}>"
     end
 
     # Public: Get a String representation of the institution.

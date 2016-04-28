@@ -1,5 +1,6 @@
 require 'test_helper'
 
+# Internal: The test for Plaid.config.
 class PlaidConfigTest < MiniTest::Test
   def test_symbol_environments
     Plaid.config do |p|
