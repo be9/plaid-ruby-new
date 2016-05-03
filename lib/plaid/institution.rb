@@ -62,9 +62,12 @@ module Plaid
     #
     # Does a GET /institutions call.
     #
+    # client - The Plaid::Client instance used to connect
+    #          (default: Plaid.client).
+    #
     # Returns an Array of Institution instances.
-    def self.all
-      Connector.new(:institutions).get.map do |idata|
+    def self.all(client: nil)
+      Connector.new(:institutions, client: client).get.map do |idata|
         new(idata)
       end
     end
@@ -73,12 +76,14 @@ module Plaid
     #
     # Does a GET /institutions/:id call.
     #
-    # id - the String institution ID (e.g. "5301a93ac140de84910000e0").
+    # id     - the String institution ID (e.g. "5301a93ac140de84910000e0").
+    # client - The Plaid::Client instance used to connect
+    #          (default: Plaid.client).
     #
     # Returns an Institution instance or raises Plaid::NotFoundError if
     # institution with given id is not found.
-    def self.get(id)
-      new Connector.new(:institutions, id).get
+    def self.get(id, client: nil)
+      new Connector.new(:institutions, id, client: client).get
     end
 
     # Public: Get information about the "long tail" institutions supported

@@ -20,26 +20,26 @@ class PlaidConnectorTest < MiniTest::Test
     reset_config
     tartan
 
-    Plaid.secret = 'fun'
+    Plaid.client.secret = 'fun'
 
     e = assert_raises(Plaid::NotConfiguredError) do
       Plaid::Connector.new(:connect, auth: true)
     end
 
-    assert_match(/must set Plaid\.client_id/, e.message)
+    assert_match(/must set Plaid::Client\.client_id/, e.message)
   end
 
   def test_secret_not_set
     reset_config
     tartan
 
-    Plaid.client_id = 'fun'
+    Plaid.client.client_id = 'fun'
 
     e = assert_raises(Plaid::NotConfiguredError) do
       Plaid::Connector.new(:connect, auth: true)
     end
 
-    assert_match(/must set Plaid\.secret/, e.message)
+    assert_match(/must set Plaid::Client\.secret/, e.message)
   end
 
   def test_200

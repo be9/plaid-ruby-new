@@ -14,13 +14,16 @@ module Plaid
     #
     # path    - The String path without leading slash. E.g. 'connect'
     # subpath - The String subpath. E.g. 'get'
-    # auth - The Boolean flag indicating that client_id and secret should be
-    #        included into the request payload.
-    def initialize(path, subpath = nil, auth: false)
+    # auth    - The Boolean flag indicating that client_id and secret should be
+    #           included into the request payload.
+    # client  - The Plaid::Client instance used to connect
+    #           (default: Plaid.client).
+    def initialize(path, subpath = nil, auth: false, client: nil)
       @auth = auth
+      @client = client || Plaid.client
       verify_configuration
 
-      path = File.join(Plaid.env, path.to_s)
+      path = File.join(@client.env, path.to_s)
       path = File.join(path, subpath.to_s) if subpath
 
       @uri = URI.parse(path)
@@ -106,8 +109,8 @@ module Plaid
     # request - The Net::HTTPGenericRequest descendant instance.
     def post_like(payload, request)
       if @auth
-        payload = payload.merge(client_id: Plaid.client_id,
-                                secret: Plaid.secret)
+        payload = payload.merge(client_id: @client.client_id,
+                                secret: @client.secret)
       end
 
       request.set_form_data(payload)
@@ -135,22 +138,19 @@ module Plaid
     #
     # Raises NotConfiguredError if anything is wrong.
     def verify_configuration
-      raise_not_configured(:env, auth: false) unless Plaid.env
+      raise_not_configured(:env, auth: false) unless @client.env
       return unless @auth
 
-      cid = Plaid.client_id
-      sec = Plaid.secret
-
-      (!cid.is_a?(String) || cid.empty?) && raise_not_configured(:client_id)
-      (!sec.is_a?(String) || sec.empty?) && raise_not_configured(:secret)
+      !@client.client_id_configured? && raise_not_configured(:client_id)
+      !@client.secret_configured? && raise_not_configured(:secret)
     end
 
     # Internal: Raise a NotConfiguredError exception with proper message.
-    def raise_not_configured(field_name, auth: true)
-      message = "You must set Plaid.#{field_name} before using any methods"
+    def raise_not_configured(field, auth: true)
+      message = "You must set Plaid::Client.#{field} before using any methods"
       message << ' which require authentication' if auth
-      message << "! It's current value is #{Plaid.send(field_name).inspect}. " \
-                 'Add a Plaid.config do .. end block somewhere in the ' \
+      message << "! It's current value is #{@client.send(field).inspect}. " \
+                 'E.g. add a Plaid.config do .. end block somewhere in the ' \
                  'initialization code of your program.'
 
       raise NotConfiguredError, message

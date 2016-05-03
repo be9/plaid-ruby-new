@@ -37,6 +37,9 @@ module Plaid
     # { message: 'Code sent to xxx-xxx-5309' }
     attr_reader :mfa
 
+    # Internal: The Plaid::Client instance used to make queries.
+    attr_reader :client
+
     # Public: Create (add) a user.
     #
     # product     - The Symbol product name you are adding the user to, one of
@@ -67,10 +70,12 @@ module Plaid
     #                             transactions (default: 30 days ago).
     #               :end_date   - The end Date to which transactions
     #                             will be collected (default: today).
+    # client      - The Plaid::Client instance used to connect to the API
+    #               (default is to use global Plaid client - Plaid.client).
     #
     # Returns a Plaid::User instance.
     def self.create(product, institution, username, password,
-                    pin: nil, options: nil)
+                    pin: nil, options: nil, client: nil)
       check_product product
 
       payload = { username: username, password: password,
@@ -78,10 +83,10 @@ module Plaid
       payload[:pin] = pin if pin
       payload[:options] = MultiJson.dump(options) if options
 
-      conn = Connector.new(product, auth: true)
+      conn = Connector.new(product, auth: true, client: client)
       resp = conn.post(payload)
 
-      new product, response: resp, mfa: conn.mfa?
+      new product, response: resp, mfa: conn.mfa?, client: client
     end
 
     # Public: Get User instance in case user access token is known.
@@ -92,10 +97,12 @@ module Plaid
     # product - The Symbol product name you want to use, one of
     #           Plaid::PRODUCTS (e.g. :info, :connect, etc.).
     # token   - The String access token for the user.
+    # client  - The Plaid::Client instance used to connect to the API
+    #           (default is to use global Plaid client - Plaid.client).
     #
     # Returns a Plaid::User instance.
-    def self.load(product, token)
-      new check_product(product), access_token: token
+    def self.load(product, token, client: nil)
+      new check_product(product), access_token: token, client: client
     end
 
     # Public: Exchange a Link public_token for an API access_token.
@@ -103,17 +110,21 @@ module Plaid
     # public_token - The String Link public_token.
     # account_id   - The String account ID.
     # product      - The Symbol product name (default: :connect).
+    # client       - The Plaid::Client instance used to connect to the API
+    #                (default is to use global Plaid client - Plaid.client).
     #
     # Returns a new User with access token obtained from Plaid and default
     # product set to product.
-    def self.exchange_token(public_token, account_id = nil, product: :connect)
+    def self.exchange_token(public_token, account_id = nil,
+                            product: :connect, client: nil)
       check_product product
 
       payload = { public_token: public_token }
       payload[:account_id] = account_id if account_id
 
-      response = Connector.new(:exchange_token, auth: true).post(payload)
-      new product, response: response
+      response = Connector.new(:exchange_token, auth: true, client: client)
+                          .post(payload)
+      new product, response: response, client: client
     end
 
     # Internal: Initialize a User instance.
@@ -123,8 +134,12 @@ module Plaid
     # response     - The Hash response body to parse.
     # mfa          - The Boolean flag indicating that response body
     #              - contains an MFA response.
-    def initialize(product, access_token: nil, response: nil, mfa: nil)
+    # client       - The Plaid::Client instance used to connect to the API
+    #                (default is to use global Plaid client - Plaid.client).
+    def initialize(product, access_token: nil, response: nil, mfa: nil,
+                   client: nil)
       @product = product
+      @client = client
       @access_token = access_token if access_token
       @mfa_required = mfa
       @accounts = @initial_transactions = @info = @risk = @income = nil
@@ -181,7 +196,7 @@ module Plaid
       options[:gte] = start_date.to_s if start_date
       options[:lte] = end_date.to_s if end_date
 
-      response = Connector.new(:connect, :get, auth: true)
+      response = Connector.new(:connect, :get, auth: true, client: client)
                           .post(access_token: access_token,
                                 options: MultiJson.dump(options))
       update_accounts(response)
@@ -210,7 +225,8 @@ module Plaid
 
       payload[:pin] = pin if pin
 
-      parse_response(Connector.new(product, auth: true).patch(payload))
+      parse_response(Connector.new(product, auth: true, client: client)
+                              .patch(payload))
 
       self
     end
@@ -222,7 +238,8 @@ module Plaid
     #
     # Returns self.
     def delete
-      Connector.new(product, auth: true).delete(access_token: access_token)
+      Connector.new(product, auth: true, client: client)
+               .delete(access_token: access_token)
 
       freeze
     end
@@ -244,7 +261,8 @@ module Plaid
     # new product.
     def upgrade(product)
       payload = { access_token: access_token, upgrade_to: product.to_s }
-      response = Connector.new(:upgrade, auth: true).post(payload)
+      response = Connector.new(:upgrade, auth: true, client: client)
+                          .post(payload)
 
       User.new product, response: response
     end
@@ -259,7 +277,7 @@ module Plaid
     #
     # Returns a new User instance.
     def for_product(product)
-      User.load product, access_token
+      User.load product, access_token, client: client
     end
 
     # Public: Get auth information for the user (routing numbers for accounts).
@@ -276,7 +294,7 @@ module Plaid
     # Returns an Array of Account with numbers baked in.
     def auth(sync: false)
       if sync || !@accounts || !@accounts[0] || !@accounts[0].numbers
-        response = Connector.new(:auth, :get, auth: true)
+        response = Connector.new(:auth, :get, auth: true, client: client)
                             .post(access_token: access_token)
 
         update_accounts(response)
@@ -296,7 +314,7 @@ module Plaid
     # Returns a Plaid::Info instance.
     def info(sync: false)
       if sync || !@info
-        parse_response(Connector.new(:info, :get, auth: true)
+        parse_response(Connector.new(:info, :get, auth: true, client: client)
                                 .post(access_token: access_token))
       end
 
@@ -314,7 +332,7 @@ module Plaid
     # Returns a Plaid::Income instance.
     def income(sync: false)
       if sync || !@income
-        parse_response(Connector.new(:income, :get, auth: true)
+        parse_response(Connector.new(:income, :get, auth: true, client: client)
                                 .post(access_token: access_token))
       end
 
@@ -332,7 +350,7 @@ module Plaid
     # Returns an Array of accounts with risk attribute set.
     def risk(sync: false)
       if sync || !@accounts || !@accounts[0] || !@accounts[0].risk
-        parse_response(Connector.new(:risk, :get, auth: true)
+        parse_response(Connector.new(:risk, :get, auth: true, client: client)
                                 .post(access_token: access_token))
       end
 
@@ -345,7 +363,7 @@ module Plaid
     #
     # Returns an Array of Plaid::Account.
     def balance
-      response = Connector.new(:balance, auth: true)
+      response = Connector.new(:balance, auth: true, client: client)
                           .post(access_token: access_token)
 
       update_accounts(response)

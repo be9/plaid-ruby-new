@@ -39,6 +39,15 @@ class PlaidInstitutionTest < MiniTest::Test
     assert_equal 'chase', i.type
   end
 
+  def test_all_institutions_with_custom_client
+    client = Plaid::Client.new(env: 'https://example.com')
+
+    stub_request(:get, 'https://example.com/institutions')
+      .to_return(status: 200, body: fixture(:institutions))
+
+    Plaid::Institution.all client: client
+  end
+
   def test_get_single_institution
     stub_request(:get, 'https://tartan.plaid.com/institutions/5301a99504977c52b60000d0')
       .to_return(status: 200, body: fixture('institution_chase'))
@@ -55,6 +64,15 @@ class PlaidInstitutionTest < MiniTest::Test
     assert_equal 'Chase', i.name
     assert_equal %i(connect auth balance info income risk), i.products
     assert_equal 'chase', i.type
+  end
+
+  def test_get_single_institution_with_custom_client
+    client = Plaid::Client.new(env: 'https://example.com')
+
+    stub_request(:get, 'https://example.com/institutions/123')
+      .to_return(status: 200, body: fixture('institution_chase'))
+
+    Plaid::Institution.get '123', client: client
   end
 
   def test_get_nonexistent_institution

@@ -6,7 +6,7 @@ module ProductTests
     full_test_credentials
   end
 
-  def test_revive
+  def test_load
     user = Plaid::User.load(product, 't0k3n')
 
     assert_kind_of Plaid::User, user
@@ -19,6 +19,13 @@ module ProductTests
     assert_raises ArgumentError do
       Plaid::User.load(:bad_product, 't0k3n')
     end
+  end
+
+  def test_load_custom_client
+    client = Plaid::Client.new
+    user = Plaid::User.load(product, 't0k3n', client: client)
+
+    assert_same client, user.client
   end
 
   def test_delete
@@ -51,6 +58,17 @@ module ProductTests
     refute_same user, another
     assert_equal product2, another.product
     assert_equal 't0k3n', another.access_token
+  end
+
+  def test_for_product_with_custom_client
+    client = Plaid::Client.new
+    user = Plaid::User.load(product, 't0k3n', client: client)
+
+    product2 = Plaid::PRODUCTS.reject { |p| p == product }.first
+
+    another = user.for_product(product2)
+
+    assert_same client, another.client
   end
 
   def test_upgrade
@@ -159,6 +177,24 @@ module ProductTests
     refute_nil user.accounts
   end
 
+  def exchange_token_with_custom_client
+    client = custom_client
+    body = {
+      'client_id' => 'boo',
+      'secret' => 'moo',
+      'public_token' => 'pu61i< T<>k3N'
+    }
+
+    stub_api :post, 'exchange_token',
+             body: body, response: '{"access_token": "3x<hang3d"}'
+
+    user = Plaid::User.exchange_token('pu61i< T<>k3N',
+                                      product: product,
+                                      client: client)
+
+    assert_same client, user.client
+  end
+
   protected
 
   def credentials(access_token: true)
@@ -171,6 +207,28 @@ module ProductTests
     credentials(access_token: false)
       .merge('password' => 'plaid_good', 'type' => 'wells',
              'username' => 'plaid_test')
+  end
+
+  def create_with_custom_client(response)
+    client = custom_client
+
+    body = {
+      'client_id' => 'boo',
+      'secret' => 'moo',
+      'username' => 'plaid_test',
+      'password' => 'plaid_good',
+      'type' => 'wells'
+    }
+
+    stub_api :post, product.to_s, body: body, response: response
+    user = Plaid::User.create(product, :wells, 'plaid_test', 'plaid_good',
+                              client: client)
+
+    assert_same client, user.client
+  end
+
+  def custom_client
+    Plaid::Client.new(env: :tartan, client_id: 'boo', secret: 'moo')
   end
 
   def run_update(fixture_name)
@@ -247,6 +305,10 @@ class PlaidConnectUserTest < MiniTest::Test
     check_transactions 16, user.initial_transactions
   end
 
+  def test_create_with_custom_client
+    create_with_custom_client :connect_add_trans
+  end
+
   def test_transactions
     user = Plaid::User.load(:connect, 't0k3n')
 
@@ -300,6 +362,10 @@ class PlaidAuthUserTest < MiniTest::Test
     check_accounts 4, user.accounts do |acc|
       refute_nil acc.numbers
     end
+  end
+
+  def test_create_with_custom_client
+    create_with_custom_client :auth_add
   end
 
   def test_auth
@@ -371,6 +437,10 @@ class PlaidInfoUserTest < MiniTest::Test
     assert_equal ['Kelly Walters'], user.info.names
   end
 
+  def test_create_with_custom_client
+    create_with_custom_client :info_add
+  end
+
   def test_info
     stub_info_get.then.to_raise(RuntimeError)
 
@@ -431,6 +501,10 @@ class PlaidIncomeUserTest < MiniTest::Test
     assert_equal 56_000, user.income.last_year_income
   end
 
+  def test_create_with_custom_client
+    create_with_custom_client :income_add
+  end
+
   def test_income
     stub_income_get.then.to_raise(RuntimeError)
 
@@ -488,6 +562,10 @@ class PlaidRiskUserTest < MiniTest::Test
 
     assert_kind_of Plaid::Risk, user.accounts[0].risk
     assert_equal 0.79, user.accounts[0].risk.score
+  end
+
+  def test_create_with_custom_client
+    create_with_custom_client :risk_add
   end
 
   def test_risk
