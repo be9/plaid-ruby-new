@@ -1,20 +1,39 @@
+require_relative 'account'
+
 module Plaid
   # Public: A class which encapsulates the authenticated user for all Plaid
   # products.
   class User
-    # Public: Access token for authenticated user.
+    # Public: The access token for authenticated user.
     attr_reader :access_token
+
+    # Public: The current product. Provides a context for #update and #delete
+    # calls. See Plaid::PRODUCTS.
+    attr_reader :product
+
+    # Public: The Array of Account instances providing accounts information
+    # for the user.
+    attr_reader :accounts
+
+    # Public: The Array of Transactions provided by initial call to User.create.
+    #
+    # If the :login_only option of User.create is set to false, the initial
+    # 30-day transactional data are returned during the API call. This attribute
+    # contains them.
+    attr_reader :initial_transactions
 
     # Public: Create (add) a user.
     #
     # product     - The Symbol product name you are adding the user to, one of
     #               Plaid::PRODUCTS (e.g. :info, :connect, etc.).
-    # institution - The String/Symbol financial institution code that you
+    # institution - The String/Symbol financial institution type that you
     #               want to access (e.g. :wells).
-    # username    - The String username associated with the financial institution.
-    # password    - The String password associated with the financial institution.
-    # pin         - The String PIN number associated with the financial institution
-    #               (default: nil).
+    # username    - The String username associated with the financial
+    #               institution.
+    # password    - The String password associated with the financial
+    #               institution.
+    # pin         - The String PIN number associated with the financial
+    #               institution (default: nil).
     # options     - the Hash options (default: {}):
     #               :list       - The Boolean flag which would request the
     #                             available send methods if the institution
@@ -35,13 +54,62 @@ module Plaid
     #                             will be collected (default: today).
     #
     # Returns a Plaid::User instance.
-    def self.create(product, institution, username, password, pin = nil, options = {})
+    def self.create(product, institution, username, password,
+                    pin: nil, options: nil)
+      check_product product
+
+      payload = { username: username, password: password,
+                  type: institution.to_s }
+      payload[:pin] = pin if pin
+      payload[:options] = MultiJson.dump(options) if options
+
+      conn = Connector.new(product, auth: true)
+
+      new product, response: conn.post(payload)
     end
 
     # Public: Get User instance in case user access token is known.
     #
-    # token - the String access token for the user.
-    def self.revive(token)
+    # No requests are made, but the returned User instance is ready to be
+    # used.
+    #
+    # product - The Symbol product name you want to use, one of
+    #           Plaid::PRODUCTS (e.g. :info, :connect, etc.).
+    # token   - The String access token for the user.
+    #
+    # Returns a Plaid::User instance.
+    def self.load(product, token)
+      new check_product(product), access_token: token
+    end
+
+    # Public: Exchange a Link public_token for an API access_token.
+    #
+    # public_token - The String Link public_token.
+    # account_id   - The String account ID.
+    # product      - The Symbol product name (default: :connect).
+    #
+    # Returns a new User with access token obtained from Plaid and default
+    # product set to product.
+    def self.exchange_token(public_token, account_id = nil, product: :connect)
+      check_product product
+
+      payload = { public_token: public_token }
+      payload[:account_id] = account_id if account_id
+
+      response = Connector.new(:exchange_token, auth: true).post(payload)
+      new product, response: response
+    end
+
+    # Internal: Initialize a User instance.
+    #
+    # product      - The Symbol product name.
+    # access_token - The String access token obtained from Plaid.
+    def initialize(product, access_token: nil, response: nil)
+      @product = product
+      @access_token = access_token if access_token
+      @accounts = @initial_transactions = @info = @risk = @income = nil
+
+      parse_response(response) if response
     end
 
     # Public: Find out if MFA is required based on last request.
@@ -76,19 +144,9 @@ module Plaid
     def mfa(info)
     end
 
-    # Public: Get transactions provided by initial call to User.create.
-    #
-    # If the :login_only option of User.create is set to false, the initial
-    # 30-day transactional data are returned during the call. This method
-    # returns them.
-    #
-    # Returns an Array of Transaction records (empty if not appropriate).
-    def initial_transactions
-    end
-
     # Public: Get transactions.
     #
-    # Does a /connect/get call.
+    # Does a /connect/get call. Updates self.accounts with latest information.
     #
     # pending    - the Boolean flag requesting to return pending transactions.
     # account_id - the String Account ID (default: nil). If this argument is
@@ -98,26 +156,57 @@ module Plaid
     # end_date   - The end Date (inclusive).
     #
     # Returns an Array of Transaction records.
-    def transactions(pending: false, account_id: nil, start_date: nil, end_date: nil)
+    def transactions(pending: false, account_id: nil,
+                     start_date: nil, end_date: nil)
+      options = { pending: pending }
+      options[:account] = account_id if account_id
+      options[:gte] = start_date.to_s if start_date
+      options[:lte] = end_date.to_s if end_date
+
+      response = Connector.new(:connect, :get, auth: true)
+                          .post(access_token: access_token,
+                                options: MultiJson.dump(options))
+      update_accounts(response)
+      build_objects(response['transactions'], Transaction)
     end
 
     # Public: Update user credentials.
     #
-    # Updates the credentials for current product. Use User#for_product
+    # Updates the user credentials for the current product. See
+    # User#for_product.
     #
-    # username    - The String username associated with the financial institution.
-    # password    - The String password associated with the financial institution.
-    # pin         - The String PIN number associated with the financial institution
-    #               (default: nil).
+    # username    - The String username associated with the financial
+    #               institution.
+    # password    - The String password associated with the financial
+    #               institution.
+    # pin         - The String PIN number associated with the financial
+    #               institution (default: nil).
     #
     # Returns self.
     def update(username, password, pin = nil)
+      payload = {
+        access_token: access_token,
+        username: username,
+        password: password
+      }
+
+      payload[:pin] = pin if pin
+
+      parse_response(Connector.new(product, auth: true).patch(payload))
+
+      self
     end
 
     # Public: Delete the user.
     #
-    # Returns true if deletion went ok.
+    # Makes a delete request and freezes self to prevent further modifications
+    # to the object.
+    #
+    # Returns self.
     def delete
+      Connector.new(product, auth: true).delete(access_token: access_token)
+
+      freeze
     end
 
     # Public: Upgrade the user.
@@ -136,6 +225,10 @@ module Plaid
     # Returns another User record with the same access token, but tied to the
     # new product.
     def upgrade(product)
+      payload = { access_token: access_token, upgrade_to: product.to_s }
+      response = Connector.new(:upgrade, auth: true).post(payload)
+
+      User.new product, response: response
     end
 
     # Public: Get the current user tied to another product.
@@ -148,38 +241,84 @@ module Plaid
     #
     # Returns a new User instance.
     def for_product(product)
+      User.load product, access_token
     end
 
-    # Public: Get auth information for the user.
+    # Public: Get auth information for the user (routing numbers for accounts).
     #
-    # Does a POST /auth/get request.
+    # Not only this method returns the new data, but it updates self.accounts as
+    # well.
     #
-    # Returns ???
-    def auth
+    # The method does a POST /auth/get request.
+    #
+    # sync - The Boolean flag which, if true, causes auth information to be
+    #        rerequested from the server. Otherwise cached version is returned,
+    #        if it exists.
+    #
+    # Returns an Array of Account with numbers baked in.
+    def auth(sync: false)
+      if sync || !@accounts || !@accounts[0] || !@accounts[0].numbers
+        response = Connector.new(:auth, :get, auth: true)
+                            .post(access_token: access_token)
+
+        update_accounts(response)
+      end
+
+      accounts
     end
 
     # Public: Get info for the user.
     #
     # Does a POST /info/get request.
     #
+    # sync - The Boolean flag which, if true, causes information to be
+    #        rerequested from the server. Otherwise cached version is returned,
+    #        if it exists.
+    #
     # Returns a Plaid::Info instance.
-    def info
+    def info(sync: false)
+      if sync || !@info
+        parse_response(Connector.new(:info, :get, auth: true)
+                                .post(access_token: access_token))
+      end
+
+      @info
     end
 
-    # Public: Get income data for the user.
+    # Public: Get income information for the user.
     #
     # Does a POST /income/get request.
     #
+    # sync - The Boolean flag which, if true, causes income information to be
+    #        rerequested from the server. Otherwise cached version is returned,
+    #        if it exists.
+    #
     # Returns a Plaid::Income instance.
-    def income
+    def income(sync: false)
+      if sync || !@income
+        parse_response(Connector.new(:income, :get, auth: true)
+                                .post(access_token: access_token))
+      end
+
+      @income
     end
 
-    # Public: Get risk data for the user.
+    # Public: Get risk data for the user's accounts.
     #
     # Does a POST /risk/get request.
     #
-    # Returns a Plaid::Risk instance.
-    def risk
+    # sync - The Boolean flag which, if true, causes risk information to be
+    #        rerequested from the server. Otherwise cached version is returned,
+    #        if it exists.
+    #
+    # Returns an Array of accounts with risk attribute set.
+    def risk(sync: false)
+      if sync || !@accounts || !@accounts[0] || !@accounts[0].risk
+        parse_response(Connector.new(:risk, :get, auth: true)
+                                .post(access_token: access_token))
+      end
+
+      @accounts
     end
 
     # Public: Get current account balance.
@@ -188,6 +327,59 @@ module Plaid
     #
     # Returns an Array of Plaid::Account.
     def balance
+      response = Connector.new(:balance, auth: true)
+                          .post(access_token: access_token)
+
+      update_accounts(response)
+    end
+
+    private
+
+    # Internal: Validate the product name.
+    def self.check_product(product)
+      if Plaid::PRODUCTS.include?(product)
+        product
+      else
+        raise ArgumentError, "product (#{product.inspect}) must be one of " \
+                             "Plaid products (#{Plaid::PRODUCTS.inspect})"
+      end
+    end
+
+    private_class_method :check_product
+
+    # Internal: Set up attributes from Add User response.
+    def parse_response(response)
+      @access_token = response['access_token']
+
+      update_accounts(response) if response['accounts']
+
+      if (trans = response['transactions'])
+        @initial_transactions = build_objects(trans, Transaction)
+      end
+
+      if (income = response['income'])
+        @income = Plaid::Income.new(income)
+      end
+
+      return unless (i = response['info'])
+      @info = Plaid::Info.new(i)
+    end
+
+    # Internal: Convert an array of data into an array of objects, encapsulating
+    # that data.
+    def build_objects(data, klass)
+      data ? data.map { |element| klass.new(element) } : []
+    end
+
+    # Internal: Update account data from the response.
+    def update_accounts(response)
+      new_accounts = build_objects(response['accounts'], Account)
+
+      if @accounts
+        Account.merge @accounts, new_accounts
+      else
+        @accounts = new_accounts
+      end
     end
   end
 end
