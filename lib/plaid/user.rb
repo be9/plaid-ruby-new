@@ -22,6 +22,21 @@ module Plaid
     # contains them.
     attr_reader :initial_transactions
 
+    # Public: The Symbol MFA type to be used (or nil, if no MFA required).
+    #
+    # E.g. :questions, :list, or :device.
+    attr_reader :mfa_type
+
+    # Public: The MFA data (Hash or Array of Hash) or nil, if no MFA required.
+    #
+    # E.g. [{ question: "What was the name of your first pet?" }]
+    # or
+    # [{ mask: 't..t@plaid.com', type: 'email' },
+    #  { mask: 'xxx-xxx-5309',   type: 'phone' }]
+    # or
+    # { message: 'Code sent to xxx-xxx-5309' }
+    attr_reader :mfa
+
     # Public: Create (add) a user.
     #
     # product     - The Symbol product name you are adding the user to, one of
@@ -64,8 +79,9 @@ module Plaid
       payload[:options] = MultiJson.dump(options) if options
 
       conn = Connector.new(product, auth: true)
+      resp = conn.post(payload)
 
-      new product, response: conn.post(payload)
+      new product, response: resp, mfa: conn.mfa?
     end
 
     # Public: Get User instance in case user access token is known.
@@ -104,9 +120,13 @@ module Plaid
     #
     # product      - The Symbol product name.
     # access_token - The String access token obtained from Plaid.
-    def initialize(product, access_token: nil, response: nil)
+    # response     - The Hash response body to parse.
+    # mfa          - The Boolean flag indicating that response body
+    #              - contains an MFA response.
+    def initialize(product, access_token: nil, response: nil, mfa: nil)
       @product = product
       @access_token = access_token if access_token
+      @mfa_required = mfa
       @accounts = @initial_transactions = @info = @risk = @income = nil
 
       parse_response(response) if response
@@ -117,31 +137,29 @@ module Plaid
     # After calling e.g. User.create you might need to make an additional
     # authorization step if MFA is required by the financial institution.
     #
-    # Returns true if this step is needed.
-    def mfa_required?
-    end
-
-    # Public: Initiate MFA.
-    #
-    # send_method - The Hash which specifies which code delivery method to
-    #               use.
-    #
-    # Examples
-    #
-    #   mfa_request({type: "phone"})
-    #
-    #   mfa_request({mask:"123-...-4321"})
-    #
-    # Returns true if code was sent.
-    def mfa_request(send_method = {})
+    # Returns true if this step is needed, a falsey value otherwise.
+    def mfa?
+      @mfa_required
     end
 
     # Public: Submit MFA information.
     #
-    # info - The String with MFA information.
+    # info        - The String with MFA information (default: nil).
+    # send_method - The Hash with code send method information.
+    #               E.g. { type: 'phone' } or { mask: '123-...-4321' }.
+    #               Default is first available email.
     #
     # Returns true if whole MFA process is completed, false otherwise.
-    def mfa(info)
+    def mfa_step(info = nil, send_method: nil)
+      payload = { access_token: access_token }
+      payload[:mfa] = info if info
+      payload[:send_method] = MultiJson.dump(send_method) if send_method
+
+      conn = Connector.new(product, :step, auth: true)
+      response = conn.post(payload)
+
+      @mfa_required = conn.mfa?
+      parse_response(response)
     end
 
     # Public: Get transactions.
@@ -350,6 +368,9 @@ module Plaid
     # Internal: Set up attributes from Add User response.
     def parse_response(response)
       @access_token = response['access_token']
+      return parse_mfa_response(response) if mfa?
+
+      @mfa_type = @mfa = nil
 
       update_accounts(response) if response['accounts']
 
@@ -363,6 +384,12 @@ module Plaid
 
       return unless (i = response['info'])
       @info = Plaid::Info.new(i)
+    end
+
+    # Internal: Parse an MFA response
+    def parse_mfa_response(response)
+      @mfa_type = response['type'].to_sym
+      @mfa = Plaid.symbolize_hash(response['mfa'])
     end
 
     # Internal: Convert an array of data into an array of objects, encapsulating

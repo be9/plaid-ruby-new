@@ -12,6 +12,9 @@ module ProductTests
     assert_kind_of Plaid::User, user
     assert_equal product, user.product
     assert_equal 't0k3n', user.access_token
+    refute user.mfa?
+    assert_nil user.mfa_type
+    assert_nil user.mfa
 
     assert_raises ArgumentError do
       Plaid::User.load(:bad_product, 't0k3n')
@@ -82,6 +85,80 @@ module ProductTests
     assert_equal product, user.product
   end
 
+  def test_question_mfa
+    # Initial create call
+    stub_api :post, product, body: params_for_create, response: :mfa_questions,
+                             status: 201
+
+    user = Plaid::User.create(product, :wells, 'plaid_test', 'plaid_good')
+    assert_nil user.accounts
+
+    assert_predicate user, :mfa?
+    assert_equal :questions, user.mfa_type
+    assert_equal([{ question: 'What was the name of your first pet?' }],
+                 user.mfa)
+
+    # A call with wrong answer
+    body = credentials.merge(mfa: 'wrong_answer')
+    stub_api :post, "#{product}/step", body: body, response: :mfa_questions,
+                                       status: 201
+
+    user.mfa_step 'wrong_answer'
+
+    assert_predicate user, :mfa?
+    assert_equal :questions, user.mfa_type
+    assert_equal([{ question: 'What was the name of your first pet?' }],
+                 user.mfa)
+
+    # A call with right answer
+    body = credentials.merge(mfa: 'right_answer')
+    stub_api :post, "#{product}/step", body: body,
+                                       response: "#{product}_add".to_sym
+    user.mfa_step 'right_answer'
+
+    refute_predicate user, :mfa?
+    assert_nil user.mfa_type
+    assert_nil user.mfa
+    refute_nil user.accounts
+  end
+
+  def test_code_mfa
+    # Initial create call
+    body = params_for_create.merge('options' => '{"list":true}')
+    stub_api :post, product, body: body, response: :mfa_list,
+                             status: 201
+
+    user = Plaid::User.create(product, :wells, 'plaid_test', 'plaid_good',
+                              options: { list: true })
+
+    assert_predicate user, :mfa?
+    assert_equal :list, user.mfa_type
+    assert_equal([{ mask: 't..t@plaid.com', type: 'email' },
+                  { mask: 'xxx-xxx-5309', type: 'phone' },
+                  { mask: 'SafePass Card', type: 'card' }], user.mfa)
+
+    # Request to send code
+    body = credentials.merge(send_method: '{"type":"phone"}')
+    stub_api :post, "#{product}/step", body: body, response: :mfa_code_sent,
+                                       status: 201
+
+    user.mfa_step send_method: { type: 'phone' }
+    assert_predicate user, :mfa?
+    assert_equal :device, user.mfa_type
+    assert_equal({ message: 'Code sent to xxx-xxx-5309' }, user.mfa)
+
+    # Send right code
+    body = credentials.merge(mfa: '777')
+    stub_api :post, "#{product}/step", body: body,
+                                       response: "#{product}_add".to_sym
+    user.mfa_step '777'
+
+    refute_predicate user, :mfa?
+    assert_nil user.mfa_type
+    assert_nil user.mfa
+    refute_nil user.accounts
+  end
+
   protected
 
   def credentials(access_token: true)
@@ -128,6 +205,9 @@ module ProductTests
   def check_user(user)
     assert_instance_of Plaid::User, user
     refute_nil user.access_token
+    refute_predicate user, :mfa?
+    assert_nil user.mfa_type
+    assert_nil user.mfa
   end
 end
 

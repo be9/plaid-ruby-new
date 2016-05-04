@@ -74,6 +74,7 @@ module Plaid
     # Returns a Hash with keys.to_sym (or nil if hash is nil).
     def symbolize_hash(hash, values: false)
       return unless hash
+      return hash.map { |h| symbolize_hash(h) } if hash.is_a?(Array)
 
       hash.each_with_object({}) do |(k, v), memo|
         memo[k.to_sym] = values ? v.to_sym : v
