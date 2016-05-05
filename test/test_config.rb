@@ -7,13 +7,13 @@ class PlaidConfigTest < MiniTest::Test
       p.env = :tartan
     end
 
-    assert_equal 'https://tartan.plaid.com/', Plaid.env
+    assert_equal 'https://tartan.plaid.com/', Plaid.client.env
 
     Plaid.config do |p|
       p.env = :api
     end
 
-    assert_equal 'https://api.plaid.com/', Plaid.env
+    assert_equal 'https://api.plaid.com/', Plaid.client.env
   end
 
   def test_string_url
@@ -21,7 +21,7 @@ class PlaidConfigTest < MiniTest::Test
       p.env = 'https://www.example.com/'
     end
 
-    assert_equal 'https://www.example.com/', Plaid.env
+    assert_equal 'https://www.example.com/', Plaid.client.env
   end
 
   def test_wrong_values_for_env

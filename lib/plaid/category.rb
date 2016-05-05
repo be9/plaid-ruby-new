@@ -35,9 +35,12 @@ module Plaid
     #
     # Does a GET /categories call.
     #
+    # client - The Plaid::Client instance used to connect
+    #          (default: Plaid.client).
+    #
     # Returns an Array of Category instances.
-    def self.all
-      Connector.new(:categories).get.map do |category_data|
+    def self.all(client: nil)
+      Connector.new(:categories, client: client).get.map do |category_data|
         new(category_data)
       end
     end
@@ -46,12 +49,14 @@ module Plaid
     #
     # Does a GET /categories/:id call.
     #
-    # id - the String category ID (e.g. "17001013").
+    # id     - the String category ID (e.g. "17001013").
+    # client - The Plaid::Client instance used to connect
+    #          (default: Plaid.client).
     #
     # Returns a Category instance or raises Plaid::NotFoundError if category
     # with given id is not found.
-    def self.get(id)
-      new Connector.new(:categories, id).get
+    def self.get(id, client: nil)
+      new Connector.new(:categories, id, client: client).get
     end
   end
 end

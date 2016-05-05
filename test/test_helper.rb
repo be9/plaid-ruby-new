@@ -10,9 +10,8 @@ module TestHelpers
   end
 
   def reset_config
-    Plaid.client_id = nil
-    Plaid.secret = nil
-    Plaid.env = nil
+    Plaid.config do |_|
+    end
   end
 
   def tartan

@@ -7,6 +7,7 @@ require 'plaid/user'
 require 'plaid/transaction'
 require 'plaid/info'
 require 'plaid/income'
+require 'plaid/client'
 
 require 'uri'
 
@@ -16,15 +17,8 @@ module Plaid
   PRODUCTS = %i(connect auth info income risk).freeze
 
   class <<self
-    # Public: The String Plaid account client ID to authenticate requests.
-    attr_accessor :client_id
-
-    # Public: The String Plaid account secret to authenticate requests.
-    attr_accessor :secret
-
-    # Public: Plaid environment to use. Should be set to :tartan, :api, or a
-    # full URL like 'https://tartan.plaid.com'.
-    attr_accessor :env
+    # Public: The default Client.
+    attr_accessor :client
 
     # Public: The Integer read timeout for requests to Plaid HTTP API.
     # Should be specified in seconds. Default value is 120 (2 minutes).
@@ -45,24 +39,9 @@ module Plaid
     #
     # Returns nothing.
     def config
-      yield self
-
-      case env
-      when :tartan, :api
-        self.env = "https://#{env}.plaid.com/"
-      when String
-        begin
-          URI.parse(env)
-        rescue
-          raise ArgumentError, "Invalid URL in Plaid.env (#{env.inspect}). " \
-                               'Specify either Symbol (:tartan, :api), or a ' \
-                               "full URL, like 'https://tartan.plaid.com'"
-        end
-      else
-        raise ArgumentError, "Invalid value for Plaid.env (#{env.inspect}): " \
-                             'must be :tartan, :api, or a full URL, ' \
-                             "e.g. 'https://tartan.plaid.com'"
-      end
+      client = Client.new
+      yield client
+      self.client = client
     end
 
     # Internal: Symbolize keys (and values) for a hash.
