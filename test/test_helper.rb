@@ -28,12 +28,21 @@ module TestHelpers
     end
   end
 
-  def stub_api(method, path, body: {}, status: 200, response: nil)
+  def stub_api(method, path, body: {}, query: {}, status: 200, response: nil,
+               host: 'tartan.plaid.com')
     response = fixture(response) if response.is_a?(Symbol)
 
-    stub_request(method, "https://tartan.plaid.com/#{path}")
-      .with(body: body,
-            headers: { 'Content-Type' => 'application/x-www-form-urlencoded' })
-      .to_return(status: status, body: response)
+    headers = {}
+    headers['Content-Type'] = 'application/x-www-form-urlencoded' \
+      if method != :get
+
+    expectations = {}
+    expectations[:headers] = headers unless headers.empty?
+    expectations[:body] = body unless body.empty?
+    expectations[:query] = query unless query.empty?
+
+    stub = stub_request(method, "https://#{host}/#{path}")
+    stub = stub.with(expectations) unless expectations.empty?
+    stub.to_return(status: status, body: response)
   end
 end
