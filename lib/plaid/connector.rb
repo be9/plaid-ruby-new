@@ -37,8 +37,12 @@ module Plaid
     # Internal: Run GET request.
     #
     # Returns the parsed JSON response body.
-    def get
-      run Net::HTTP::Get.new(@uri.path)
+    def get(payload = {})
+      payload = with_credentials(payload)
+
+      @uri.query = URI.encode_www_form(payload) unless payload.empty?
+
+      run Net::HTTP::Get.new(@uri)
     end
 
     # Internal: Run POST request.
@@ -108,12 +112,7 @@ module Plaid
     # payload - The Hash with posted data.
     # request - The Net::HTTPGenericRequest descendant instance.
     def post_like(payload, request)
-      if @auth
-        payload = payload.merge(client_id: @client.client_id,
-                                secret: @client.secret)
-      end
-
-      request.set_form_data(payload)
+      request.set_form_data(with_credentials(payload))
 
       run request
     end
@@ -154,6 +153,16 @@ module Plaid
                  'initialization code of your program.'
 
       raise NotConfiguredError, message
+    end
+
+    # Internal: Merge credentials to the payload if needed.
+    def with_credentials(payload)
+      if @auth
+        payload.merge(client_id: @client.client_id,
+                      secret: @client.secret)
+      else
+        payload
+      end
     end
   end
 end
